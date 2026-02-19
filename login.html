@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン画面 - Loading Added</title>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- 既存のスタイル（変更なし） --- */
+        body { margin: 0; height: 100vh; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #1a1a5e 0%, #000000 100%); font-family: 'Zen Old Mincho', serif; overflow: hidden; }
+        .login-panel { width: 450px; height: 85vh; min-height: 720px; max-height: 900px; background-color: #7a7a7a; border: 5px solid #000; border-radius: 65px; box-shadow: 25px 25px 50px rgba(0, 0, 0, 0.7); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+        .panel-header { border-bottom: 5px solid #000; padding: 4vh 0; text-align: center; background-color: #6d6d6d; flex-shrink: 0; }
+        .panel-header h1 { margin: 0; color: #fff; font-size: min(7vh, 56px); letter-spacing: 12px; text-indent: 12px; font-weight: normal; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .form-content { flex-grow: 1; position: relative; padding: 0 45px; }
+        .input-group { width: 100%; display: flex; flex-direction: column; align-items: center; position: absolute; left: 0; }
+        .account-section { top: 3vh; }
+        .password-section { top: 50%; transform: translateY(-50%); }
+        .connect-area { position: absolute; bottom: 130px; width: 100%; left: 0; text-align: center; }
+        .label { font-size: min(4.5vh, 38px); color: #0c0c0c; margin-bottom: 2vh; letter-spacing: 3px; text-indent: 3px; }
+        input { width: 85%; height: 8vh; max-height: 70px; background-color: #e63946; border: 4px solid #000; border-radius: 20px; box-shadow: inset 6px 6px 12px rgba(0, 0, 0, 0.5); outline: none; color: #fff; font-size: min(4vh, 32px); font-family: 'Zen Old Mincho', serif; text-align: center; box-sizing: border-box; transition: all 0.2s; }
+        input:focus { transform: scale(1.02); background-color: #ff4d5a; }
+        .connect-text { font-size: min(8vh, 65px); color: #0c0c0c; cursor: pointer; display: inline-block; letter-spacing: 8px; text-indent: 8px; transition: all 0.2s; }
+        .connect-text:hover { color: #fff; transform: scale(1.1); }
+        .register-button { position: absolute; bottom: 35px; right: 40px; background-color: #ff85a1; border: 3px solid #000; padding: 10px 25px; border-radius: 12px; color: #000; font-size: 24px; cursor: pointer; box-shadow: 5px 5px 0px #000; font-family: 'Zen Old Mincho', serif; }
+        .register-button:active { box-shadow: none; transform: translate(4px, 4px); }
+
+        /* --- 新しく追加したスタイル：進捗演出用 --- */
+        #loading-overlay {
+            display: none; /* 最初は非表示 */
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.85); /* フォームを隠すための暗幕 */
+            z-index: 100;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loader-title { color: #fff; font-size: 28px; margin-bottom: 30px; letter-spacing: 4px; }
+
+        /* 外枠 */
+        .progress-container {
+            width: 75%; height: 35px;
+            background: #333; border: 4px solid #000;
+            border-radius: 10px; overflow: hidden;
+            box-shadow: 0 0 15px rgba(230, 57, 70, 0.4);
+        }
+
+        /* ゲージの中身 */
+        .progress-bar {
+            width: 0%; height: 100%;
+            background: linear-gradient(90deg, #e63946, #ff85a1);
+            transition: width 0.4s ease-out;
+        }
+
+        .loader-status { color: #ccc; font-size: 16px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="login-panel">
+        <div id="loading-overlay">
+            <div class="loader-title">SERVER CONNECTING...</div>
+            <div class="progress-container">
+                <div id="progress-bar" class="progress-bar"></div>
+            </div>
+            <div id="loader-status" class="loader-status">サーバーに信号を送信中...</div>
+        </div>
+
+        <div class="panel-header"><h1>ログイン</h1></div>
+        
+        <div class="form-content">
+            <div class="input-group account-section">
+                <div class="label">アカウント名</div>
+                <input type="text" id="account-name" spellcheck="false" autocomplete="off">
+            </div>
+            
+            <div class="input-group password-section">
+                <div class="label">パスワード</div>
+                <input type="password" id="password">
+            </div>
+            
+            <div class="connect-area">
+                <div class="connect-text" onclick="handleConnect()">接続</div>
+            </div>
+        </div>
+
+        <div class="register-button" onclick="handleRegister()">新規登録</div>
+    </div>
+
+    <script>
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbzrw0dO37MTp5EgWUld-1g499wLrDInGsLjhCpR6xnaT-B88-QbO110urdSpN21BOCu/exec";
+
+        async function handleConnect() {
+            const name = document.getElementById('account-name').value;
+            const pass = document.getElementById('password').value;
+            if(!name || !pass) { alert("入力してください"); return; }
+
+            // --- 進捗演出の開始（追加部分） ---
+            const overlay = document.getElementById('loading-overlay');
+            const bar = document.getElementById('progress-bar');
+            const status = document.getElementById('loader-status');
+
+            overlay.style.display = 'flex';
+            bar.style.width = '20%'; // 通信開始
+
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: "POST",
+                    body: JSON.stringify({ action: "login", name: name, pass: pass })
+                });
+                
+                bar.style.width = '60%'; // サーバーから応答あり
+                status.innerText = "アカウント情報を照合中...";
+
+                const result = await response.json();
+                
+                if (result.status === "success") {
+                    bar.style.width = '100%'; // 照合完了
+                    status.innerText = "認証成功。ロビーへ移動します。";
+
+                    sessionStorage.setItem('userData', JSON.stringify(result));
+                    
+                    // 演出を見せるために少し待ってから遷移
+                    setTimeout(() => {
+                        window.location.href = "lobby.html";
+                    }, 1000);
+
+                } else {
+                    // 失敗時はオーバーレイを隠してエラー表示
+                    overlay.style.display = 'none';
+                    bar.style.width = '0%';
+                    alert(result.message);
+                }
+            } catch (e) { 
+                overlay.style.display = 'none';
+                alert("接続エラーが発生しました。"); 
+            }
+        }
+
+        // handleRegister は変更なし
+        async function handleRegister() {
+            const name = document.getElementById('account-name').value;
+            const pass = document.getElementById('password').value;
+            if (!name || !pass) { alert("入力してください"); return; }
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: "POST",
+                    body: JSON.stringify({ action: "register", name: name, pass: pass })
+                });
+                const result = await response.json();
+                alert(result.message);
+            } catch (e) { alert("登録に失敗しました。"); }
+        }
+    </script>
+</body>
+</html>
